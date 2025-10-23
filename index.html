@@ -3,30 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Simple Website</title>
+    <title>Crypto Monitor</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
-        <h1>Welcome to My Website</h1>
-        <nav>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
-        </nav>
+        <h1>Crypto Price Monitor</h1>
+        <p>Live cryptocurrency prices (USD)</p>
     </header>
 
-    <section id="about">
-        <h2>About Me</h2>
-        <p>This is a simple website I made to upload on GitHub Pages.</p>
-    </section>
-
-    <section id="contact">
-        <h2>Contact</h2>
-        <p>Email: example@example.com</p>
+    <section id="crypto">
+        <table>
+            <thead>
+                <tr>
+                    <th>Coin</th>
+                    <th>Price</th>
+                    <th>24h Change</th>
+                </tr>
+            </thead>
+            <tbody id="crypto-table">
+                <!-- Data will be inserted here -->
+            </tbody>
+        </table>
     </section>
 
     <footer>
-        <p>&copy; 2025 My Website</p>
+        <p>&copy; 2025 Crypto Monitor</p>
     </footer>
 
     <script src="script.js"></script>
