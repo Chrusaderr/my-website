@@ -1,5 +1,8 @@
 const coins = ["bitcoin", "ethereum", "litecoin", "dogecoin"];
 const tableBody = document.getElementById("crypto-table");
+const refreshSelect = document.getElementById("refresh");
+
+let intervalId;
 
 async function fetchPrices() {
     const response = await fetch(
@@ -24,5 +27,12 @@ async function fetchPrices() {
     });
 }
 
-fetchPrices();
-setInterval(fetchPrices, 30000);
+function startAutoRefresh() {
+    if (intervalId) clearInterval(intervalId);
+    fetchPrices();
+    const interval = parseInt(refreshSelect.value);
+    intervalId = setInterval(fetchPrices, interval);
+}
+
+refreshSelect.addEventListener("change", startAutoRefresh);
+startAutoRefresh();

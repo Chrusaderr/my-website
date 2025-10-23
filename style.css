@@ -14,6 +14,12 @@ header {
     box-shadow: 0 4px 6px rgba(0,0,0,0.2);
 }
 
+label, select {
+    color: #fff;
+    font-size: 0.9rem;
+    margin-left: 0.5rem;
+}
+
 table {
     width: 90%;
     margin: 2rem auto;
