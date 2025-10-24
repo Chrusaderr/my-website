@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AI Trader Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:,">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+  <script>
+    function registerFinancialPlugin() {
+      if (window.Chart && Chart.registry && Chart.registry.controllers && window['chartjs-chart-financial']) {
+        try {
+          const fin = window['chartjs-chart-financial'];
+          Chart.register(
+            fin.CandlestickController,
+            fin.OhlcController,
+            fin.CandlestickElement,
+            fin.OhlcElement
+          );
+          console.log("✅ Candlestick controller registered successfully!");
+        } catch (e) {
+          console.error("❌ Registration error:", e);
+        }
+      } else {
+        console.warn("⏳ Retrying plugin registration...");
+        setTimeout(registerFinancialPlugin, 300);
+      }
+    }
+    registerFinancialPlugin();
+  </script>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; background:#0f1115; color:#eaeef3; margin:0; padding:24px; }
+    .card { background:#171a21; border:1px solid #222735; border-radius:14px; padding:16px 18px; margin:12px 0; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+    .title { font-size:22px; font-weight:700; margin-bottom:8px; }
+    .row { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+    .kv { min-width:160px; }
+    .label { font-size:12px; opacity:.7; text-transform:uppercase; letter-spacing:.06em; }
+    .val { font-size:20px; font-weight:600; margin-top:6px; }
+    select, button { background:#0f1115; color:#eaeef3; border:1px solid #333; border-radius:8px; padding:6px 10px; font-size:14px; cursor:pointer; }
+    button { transition:.15s; }
+    button:hover { filter: brightness(1.2); }
+    canvas { background:#111318; border-radius:12px; padding:12px; }
+    .subchart { margin-top:12px; }
+  </style>
+</head>
+<body>
+  <h1>AI Trader Dashboard</h1>
+  <div class="card">
+    <div class="title">Controls & Live Stats</div>
+    <div class="row">
+      <div class="kv">
+        <div class="label">Coin</div>
+        <select id="coinSelect">
+          <option value="BTCUSDT">Bitcoin (BTC)</option>
+          <option value="ETHUSDT">Ethereum (ETH)</option>
+          <option value="DOGEUSDT">Dogecoin (DOGE)</option>
+          <option value="SOLUSDT">Solana (SOL)</option>
+          <option value="ADAUSDT">Cardano (ADA)</option>
+        </select>
+      </div>
+      <div class="row">
+        <button onclick="setMode('run')" style="border-color:#33d69f;">Start</button>
+        <button onclick="setMode('scan')" style="border-color:#e6b800;">Scan</button>
+        <button onclick="setMode('off')" style="border-color:#ff6b6b;">Stop</button>
+      </div>
+      <div class="kv"><div class="label">Timestamp</div><div class="val" id="ts">—</div></div>
+      <div class="kv"><div class="label">Price</div><div class="val" id="price">—</div></div>
+      <div class="kv"><div class="label">Prediction</div><div class="val" id="pred">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">Live Candlestick Chart (1s Updates)</div>
+    <canvas id="priceChart" height="300"></canvas>
+    <canvas id="indicatorChart" class="subchart" height="120"></canvas>
+  </div>
+  <script>
+    let selectedSymbol = "BTCUSDT";
+    const maxCandles = 60;
+    const ctx = document.getElementById("priceChart").getContext("2d");
+    let candleChart;
+    window.addEventListener('load', () => {
+      function initChart() {
+        try {
+          if (!Chart.registry.controllers.get('candlestick')) {
+            console.warn("⏳ Waiting for candlestick controller...");
+            return setTimeout(initChart, 200);
+          }
+          candleChart = new Chart(ctx, {
+            type: 'candlestick',
+            data: { datasets: [{ label: selectedSymbol, data: [] }] },
+            options: {
+              animation: false,
+              parsing: false,
+              scales: {
+                x: { type: 'time', ticks: { color: '#ccc' }, grid: { color: '#222' } },
+                y: { ticks: { color: '#ccc' }, grid: { color: '#222' } }
+              },
+              plugins: { legend: { labels: { color: '#ccc' } } }
+            }
+          });
+          console.log("📊 Candlestick chart initialized.");
+        } catch (e) {
+          console.error("❌ Chart init error:", e);
+          setTimeout(initChart, 300);
+        }
+      }
+      initChart();
+    });
+    const ictx = document.getElementById("indicatorChart").getContext("2d");
+    const indicatorChart = new Chart(ictx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: "RSI", data: [], borderWidth: 1.5, borderColor: "#33d69f", fill: false, yAxisID: 'y' },
+          { label: "MACD", data: [], borderWidth: 1.5, borderColor: "#ff6b6b", fill: false, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: { position: 'left', ticks: { color: '#33d69f' }, grid: { color: '#222' } },
+          y1: { position: 'right', ticks: { color: '#ff6b6b' }, grid: { display: false } }
+        },
+        plugins: { legend: { labels: { color: '#ccc' } } }
+      }
+    });
+    async function setMode(mode) { await fetch(`/mode/${mode}`, { method: "POST" }); }
+    async function pushSymbol(symbol) {
+      await fetch(`/symbol`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol }) });
+    }
+    async function refresh() {
+      try {
+        const res = await fetch(`/latest`);
+        const d = await res.json();
+        if (d.error || !candleChart) return;
+        document.getElementById("ts").textContent = d.timestamp;
+        document.getElementById("price").textContent = d.close.toFixed(4);
+        document.getElementById("pred").textContent = d.prediction;
+        const candle = { x: new Date(d.timestamp), o: d.open, h: d.high, l: d.low, c: d.close };
+        const ds = candleChart.data.datasets[0];
+        ds.label = selectedSymbol;
+        ds.data.push(candle);
+        if (ds.data.length > maxCandles) ds.data.shift();
+        candleChart.update("none");
+        indicatorChart.data.labels.push(d.timestamp.split(" ")[1]);
+        indicatorChart.data.datasets[0].data.push(d.rsi ?? null);
+        indicatorChart.data.datasets[1].data.push(d.macd ?? null);
+        if (indicatorChart.data.labels.length > maxCandles) {
+          indicatorChart.data.labels.shift();
+          indicatorChart.data.datasets.forEach(s => s.data.shift());
+        }
+        indicatorChart.update("none");
+      } catch (err) {
+        console.error("API error:", err);
+      }
+    }
+    document.getElementById("coinSelect").addEventListener("change", async (e) => {
+      selectedSymbol = e.target.value;
+      if (!candleChart) return;
+      candleChart.data.datasets[0].data = [];
+      indicatorChart.data.labels = [];
+      indicatorChart.data.datasets.forEach(s => s.data = []);
+      await pushSymbol(selectedSymbol);
+    });
+    setInterval(refresh, 1000);
+    refresh();
+  </script>
+</body>
+</html>
