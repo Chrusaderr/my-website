@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+venv/
+backend/data/
+backend/models/
+backend/balance.json
+backend/ai_status.json
+.DS_Store
+.vscode/
+.idea/
