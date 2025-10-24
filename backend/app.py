@@ -34,21 +34,22 @@ FEATURES = [
 ]
 
 def fetch_data(symbol="BTCUSDT"):
-    # Fast REST call (1s)
+    # Faster, consistent Binance mini ticker endpoint
     try:
-        r = requests.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
+        r = requests.get(f"https://api.binance.com/api/v3/ticker/mini?symbol={symbol}", timeout=2)
         data = r.json()
         return {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "open": float(data["openPrice"]),
-            "high": float(data["highPrice"]),
-            "low": float(data["lowPrice"]),
-            "close": float(data["lastPrice"]),
-            "volume": float(data["volume"]),
+            "open": float(data.get("openPrice", 0)),
+            "high": float(data.get("highPrice", 0)),
+            "low": float(data.get("lowPrice", 0)),
+            "close": float(data.get("closePrice", 0)),
+            "volume": float(data.get("volume", 0)),
         }
     except Exception as e:
         print("❌ Fetch error:", e)
         return None
+
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty: return df
