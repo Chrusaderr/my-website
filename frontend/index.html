@@ -5,16 +5,29 @@
   <title>AI Trader Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:,">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+ <!-- Core Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+
+<!-- Chart.js financial plugin (candlestick/ohlc support) -->
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-  <script>
-    (function() {
-      const fin = window['chartjs-chart-financial'];
-      if (fin) {
-        Chart.register(fin.CandlestickController, fin.CandlestickElement, fin.OhlcElement);
-      }
-    })();
+
+<!-- Date adapter -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+
+<script>
+  // ✅ Explicitly register all required controllers and elements
+  const fin = window['chartjs-chart-financial'];
+  if (fin && Chart) {
+    Chart.register(
+      fin.CandlestickController,
+      fin.OhlcController,
+      fin.CandlestickElement,
+      fin.OhlcElement
+    );
+  } else {
+    console.error("❌ Financial plugin failed to load.");
+  }
+</script>
   </script>
   <style>
     body { font-family: system-ui, Arial, sans-serif; background:#0f1115; color:#eaeef3; margin:0; padding:24px; }
