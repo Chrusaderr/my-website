@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AI Trader Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:,">
+  <!-- UMD builds to avoid ESM/CORS hassles locally -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>AI Trader Dashboard</h1>
+    <small class="muted">v4.8 • Pro Studio • Data: Binance → CoinGecko (fallback) • <a class="link" href="/logs" target="_blank">Live Logs</a></small>
+
+    <div class="grid box">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="status"><div id="statusDot" class="dot scan"></div><span id="modeTxt">SCAN</span></div>
+          <div class="kv"><div class="label">Latency</div><div class="val" id="lat">—</div></div>
+        </div>
+
+        <div class="box">
+          <div class="label">Coin</div>
+          <select id="coinSelect">
+            <option value="DOGEUSDT">Dogecoin (DOGE)</option>
+            <option value="BTCUSDT">Bitcoin (BTC)</option>
+            <option value="ETHUSDT">Ethereum (ETH)</option>
+            <option value="SOLUSDT">Solana (SOL)</option>
+            <option value="ADAUSDT">Cardano (ADA)</option>
+          </select>
+        </div>
+
+        <div class="row box">
+          <button class="btn green" onclick="setMode('run')">Start</button>
+          <button class="btn yellow" onclick="setMode('scan')">Scan</button>
+          <button class="btn red" onclick="setMode('off')">Stop</button>
+        </div>
+
+        <div class="box">
+          <div class="label">Trade Allocation</div>
+          <div class="slider-row">
+            <input id="alloc" type="range" min="5" max="50" value="25" />
+            <div id="allocVal">25%</div>
+          </div>
+        </div>
+
+        <div class="box card" style="margin-top:16px">
+          <div class="title">Portfolio (Virtual)</div>
+          <div class="row">
+            <div class="kv"><div class="label">Balance</div><div class="val" id="bal">$—</div></div>
+            <div class="kv"><div class="label">Holdings</div><div class="val" id="hold">—</div></div>
+            <div class="kv"><div class="label">Equity</div><div class="val" id="eq">$—</div></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="kv"><div class="label">Timestamp</div><div class="val" id="ts">—</div></div>
+          <div class="kv"><div class="label">Price</div><div class="val" id="price">—</div></div>
+          <div class="kv"><div class="label">Prediction</div><div class="val" id="pred">—</div></div>
+        </div>
+        <div class="box">
+          <canvas id="priceChart" height="280"></canvas>
+          <canvas id="indChart" style="margin-top:12px" height="110"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">Paper-trading simulator. Not financial advice.</div>
+  </div>
+
+<script>
+let selectedSymbol = "DOGEUSDT";
+let mode = "scan";
+let candleChart, indChart;
+const maxCandles = 120;
+
+function setStatus(m){
+  const dot = document.getElementById("statusDot");
+  dot.classList.remove("run","scan","off");
+  dot.classList.add(m);
+  document.getElementById("modeTxt").textContent = m.toUpperCase();
+}
+
+async function setMode(m){
+  try{
+    const res = await fetch(`/mode/${m}`, {method:"POST"});
+    if(res.ok){ mode = m; setStatus(m); }
+  }catch(e){ console.error(e); }
+}
+
+async function pushSymbol(sym){
+  await fetch("/symbol", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({symbol:sym})});
+}
+
+async function pushAlloc(pct){
+  const frac = Math.max(5, Math.min(50, pct)) / 100.0;
+  await fetch("/set_trade_fraction", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({fraction:frac})});
+}
+
+function initCharts(){
+  const fin = window["chartjs-chart-financial"];
+  if(!fin || !window.Chart || !fin.CandlestickController){
+    console.warn("⏳ Waiting for candlestick controller...");
+    setTimeout(initCharts, 250);
+    return;
+  }
+  Chart.register(fin.CandlestickController, fin.OhlcController, fin.CandlestickElement, fin.OhlcElement);
+  const ctx = document.getElementById("priceChart").getContext("2d");
+  candleChart = new Chart(ctx, {
+    type: 'candlestick',
+    data: { datasets: [{ label: selectedSymbol, data: [] }] },
+    options: {
+      parsing: false, animation: false,
+      plugins: { legend: { labels: { color: '#eaeef3'} } },
+      scales: {
+        x: { type: 'time', ticks: { color:'#9aa4b2' }, grid: { color:'#222735'} },
+        y: { ticks: { color:'#9aa4b2' }, grid: { color:'#222735'} }
+      }
+    }
+  });
+  const ic = document.getElementById("indChart").getContext("2d");
+  indChart = new Chart(ic, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: "RSI", data: [], borderWidth: 1.5, yAxisID: 'y' },
+      { label: "MACD", data: [], borderWidth: 1.5, yAxisID: 'y1' }
+    ]},
+    options: {
+      parsing:false, animation:false,
+      plugins:{ legend:{ labels:{ color:'#eaeef3'} } },
+      scales:{
+        x:{ display:false },
+        y:{ ticks:{ color:'#35d49c' }, grid:{ color:'#222735'} },
+        y1:{ position:'right', ticks:{ color:'#ff6b6b' }, grid:{ display:false } }
+      }
+    }
+  });
+  console.log("✅ Charts ready");
+}
+
+async function refresh(){
+  try{
+    const r1 = await fetch('/latest'); const d = await r1.json();
+    if(d.error) return;
+    document.getElementById("ts").textContent = d.timestamp;
+    document.getElementById("price").textContent = d.close.toFixed(5);
+    document.getElementById("pred").textContent = d.prediction || "HOLD";
+    document.getElementById("lat").textContent = (d.latency_ms||0).toFixed(0) + " ms";
+    // Chart
+    if(candleChart){
+      const ds = candleChart.data.datasets[0];
+      ds.label = selectedSymbol;
+      ds.data.push({x: new Date(d.timestamp), o:d.open, h:d.high, l:d.low, c:d.close});
+      if(ds.data.length > maxCandles) ds.data.shift();
+      candleChart.update('none');
+    }
+    if(indChart){
+      indChart.data.labels.push(d.timestamp.split(" ")[1]);
+      indChart.data.datasets[0].data.push(d.rsi ?? null);
+      indChart.data.datasets[1].data.push(d.macd ?? null);
+      if(indChart.data.labels.length > maxCandles){ indChart.data.labels.shift(); indChart.data.datasets.forEach(s=>s.data.shift()); }
+      indChart.update('none');
+    }
+    // wallet
+    const r2 = await fetch('/wallet'); const w = await r2.json();
+    document.getElementById("bal").textContent = "$" + w.balance.toFixed(2);
+    document.getElementById("hold").textContent = `${w.qty.toFixed(4)} @ ${w.avg_price.toFixed(4)}`;
+    document.getElementById("eq").textContent = "$" + w.equity.toFixed(2);
+  }catch(e){ console.error(e); }
+}
+
+window.onload = () => {
+  initCharts();
+  // controls
+  const coinSel = document.getElementById('coinSelect');
+  coinSel.value = "DOGEUSDT";
+  coinSel.addEventListener('change', async e => {
+    selectedSymbol = e.target.value;
+    await pushSymbol(selectedSymbol);
+    if(candleChart){ candleChart.data.datasets[0].data = []; candleChart.update(); }
+    if(indChart){ indChart.data.labels = []; indChart.data.datasets.forEach(s=>s.data=[]); indChart.update(); }
+  });
+  const alloc = document.getElementById('alloc');
+  const allocVal = document.getElementById('allocVal');
+  alloc.addEventListener('input', e => { allocVal.textContent = e.target.value + "%"; });
+  alloc.addEventListener('change', async e => { await pushAlloc(parseInt(e.target.value,10)); });
+  setInterval(refresh, 1000);
+  refresh();
+};
+</script>
+</body>
+</html>
