@@ -1,0 +1,1 @@
+AI Trader v3 — CoinGecko, starts in SCAN.
