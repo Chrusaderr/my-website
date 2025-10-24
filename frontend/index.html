@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>AI Trader Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module">
+    import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.esm.js";
+    import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from "https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.esm.js";
+    import "https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0";
+    Chart.register(...registerables, CandlestickController, CandlestickElement, OhlcController, OhlcElement);
+    window.Chart = Chart;
+    console.log("✅ Financial chart plugin registered successfully!");
+    window.initDashboard = function() {
+      let selectedSymbol = "BTCUSDT";
+      const maxCandles = 120;
+      const ctx = document.getElementById("priceChart").getContext("2d");
+      const candleChart = new Chart(ctx, {
+        type: 'candlestick',
+        data: { datasets: [{ label: selectedSymbol, data: [] }] },
+        options: {
+          animation: false,
+          parsing: false,
+          scales: {
+            x: { type: 'time', ticks: { color: '#ccc' }, grid: { color: '#222' } },
+            y: { ticks: { color: '#ccc' }, grid: { color: '#222' } }
+          },
+          plugins: { legend: { labels: { color: '#ccc' } } }
+        }
+      });
+      const ictx = document.getElementById("indicatorChart").getContext("2d");
+      const indicatorChart = new Chart(ictx, {
+        type: 'line',
+        data: { labels: [], datasets: [
+          { label: "RSI", data: [], borderWidth: 1.5, borderColor: "#33d69f", fill: false, yAxisID: 'y' },
+          { label: "MACD", data: [], borderWidth: 1.5, borderColor: "#ff6b6b", fill: false, yAxisID: 'y1' }
+        ]},
+        options: {
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: { position: 'left', ticks: { color: '#33d69f' }, grid: { color: '#222' } },
+            y1:{ position: 'right', ticks: { color: '#ff6b6b' }, grid: { display: false } }
+          },
+          plugins: { legend: { labels: { color: '#ccc' } } }
+        }
+      });
+      async function setMode(mode) { await fetch(`/mode/${mode}`, { method: "POST" }); }
+      document.getElementById("btnStart").onclick = () => setMode("run");
+      document.getElementById("btnScan").onclick  = () => setMode("scan");
+      document.getElementById("btnStop").onclick  = () => setMode("off");
+      document.getElementById("coinSelect").addEventListener("change", async (e) => {
+        selectedSymbol = e.target.value;
+        await fetch(`/symbol`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: selectedSymbol })
+        });
+        candleChart.data.datasets[0].label = selectedSymbol;
+        candleChart.data.datasets[0].data = [];
+        indicatorChart.data.labels = [];
+        indicatorChart.data.datasets.forEach(s => s.data = []);
+      });
+      async function refresh() {
+        try {
+          const res = await fetch(`/latest`);
+          const d = await res.json();
+          if (d.error) return;
+          document.getElementById("ts").textContent = d.timestamp ?? "—";
+          if (typeof d.close === "number") document.getElementById("price").textContent = d.close.toFixed(4);
+          else document.getElementById("price").textContent = "—";
+          document.getElementById("pred").textContent = d.prediction ?? "—";
+          if (typeof d.open === "number") {
+            const candle = { x: new Date(d.timestamp), o: d.open, h: d.high, l: d.low, c: d.close };
+            const ds = candleChart.data.datasets[0];
+            ds.data.push(candle);
+            if (ds.data.length > maxCandles) ds.data.shift();
+            candleChart.update("none");
+          }
+          indicatorChart.data.labels.push((d.timestamp || "").split(" ")[1] || "");
+          indicatorChart.data.datasets[0].data.push(d.rsi ?? null);
+          indicatorChart.data.datasets[1].data.push(d.macd ?? null);
+          if (indicatorChart.data.labels.length > maxCandles) {
+            indicatorChart.data.labels.shift();
+            indicatorChart.data.datasets.forEach(s => s.data.shift());
+          }
+          indicatorChart.update("none");
+        } catch (err) {
+          console.error("API error:", err);
+        }
+      }
+      setInterval(refresh, 1000);
+      refresh();
+    };
+  </script>
+</head>
+<body onload="initDashboard()">
+  <h1>AI Trader Dashboard</h1>
+  <div class="card">
+    <div class="title">Controls & Live Stats</div>
+    <div class="row">
+      <div class="kv">
+        <div class="label">Coin</div>
+        <select id="coinSelect">
+          <option value="BTCUSDT">Bitcoin (BTC)</option>
+          <option value="ETHUSDT">Ethereum (ETH)</option>
+          <option value="DOGEUSDT">Dogecoin (DOGE)</option>
+          <option value="SOLUSDT">Solana (SOL)</option>
+          <option value="ADAUSDT">Cardano (ADA)</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="btnStart" style="border-color:#33d69f;">Start</button>
+        <button id="btnScan"  style="border-color:#e6b800;">Scan</button>
+        <button id="btnStop"  style="border-color:#ff6b6b;">Stop</button>
+      </div>
+      <div class="kv"><div class="label">Timestamp</div><div class="val" id="ts">—</div></div>
+      <div class="kv"><div class="label">Price</div><div class="val" id="price">—</div></div>
+      <div class="kv"><div class="label">Prediction</div><div class="val" id="pred">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">Live Candlestick Chart (1s Updates)</div>
+    <canvas id="priceChart" height="300"></canvas>
+    <canvas id="indicatorChart" class="subchart" height="120"></canvas>
+  </div>
+  <div class="card">
+    <div class="title">Quick Links</div>
+    <a class="btnlink" href="/logs" target="_blank">Open Live Logs</a>
+  </div>
+</body>
+</html>
