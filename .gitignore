@@ -1,0 +1,18 @@
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+
+# Virtualenv / env
+venv/
+.env
+
+# Runtime data
+backend/data/
+backend/models/
+backend/balance.json
+backend/ai_status.json
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
