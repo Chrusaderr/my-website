@@ -1,0 +1,8 @@
+flask
+pandas
+ta
+joblib
+xgboost
+scikit-learn
+python-dotenv
+webull
