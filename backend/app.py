@@ -38,21 +38,25 @@ FEATURES = [
 
 # --- Data Fetch (robust) ---
 def fetch_data(symbol="BTCUSDT"):
-    """Use Binance bookTicker (always returns bid/ask)."""
+    """Fetch live ticker data reliably from Binance."""
     try:
-        url = f"https://api.binance.com/api/v3/ticker/bookTicker?symbol={symbol}"
+        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
         r = requests.get(url, timeout=2)
         data = r.json()
-        close_price = float(data.get("askPrice") or data.get("bidPrice") or 0.0)
-        # Use the same price for o/h/l on 1s ticks
+
+        # Get actual price
+        price = float(data.get("price", 0.0))
+
+        # Use same price for open/high/low/close for this 1s tick
         return {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "open": close_price,
-            "high": close_price,
-            "low": close_price,
-            "close": close_price,
+            "open": price,
+            "high": price,
+            "low": price,
+            "close": price,
             "volume": 0.0
         }
+
     except Exception as e:
         print("❌ Fetch error:", e)
         try:
@@ -60,6 +64,7 @@ def fetch_data(symbol="BTCUSDT"):
         except Exception:
             pass
         return None
+
 
 # --- Features ---
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
