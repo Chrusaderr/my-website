@@ -37,7 +37,7 @@ FEATURES = [
 
 def fetch_data(symbol="BTCUSDT"):
     try:
-        url = f("https://data-api.binance.vision/api/v3/ticker/price?symbol={symbol}")
+       url = f"https://data-api.binance.vision/api/v3/ticker/price?symbol={symbol}"
         r = requests.get(url, timeout=3)
         data = r.json()
         price = float(data.get("price", 0.0))
