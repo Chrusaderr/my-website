@@ -15,12 +15,12 @@
   <!-- ✅ Load the date adapter -->
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.min.js"></script>
 
+  <!-- ✅ Fixed: Wait until Chart.js + plugin are both ready -->
   <script>
-    // ✅ Wait until Chart.js is fully loaded before registering
-    window.addEventListener('load', () => {
-      try {
-        const fin = window['chartjs-chart-financial'];
-        if (fin && window.Chart) {
+    document.addEventListener("DOMContentLoaded", () => {
+      function waitForChart() {
+        if (window.Chart && window['chartjs-chart-financial']) {
+          const fin = window['chartjs-chart-financial'];
           Chart.register(
             fin.CandlestickController,
             fin.OhlcController,
@@ -29,11 +29,11 @@
           );
           console.log("✅ Candlestick controller registered successfully!");
         } else {
-          console.error("❌ Financial plugin or Chart.js failed to load.");
+          console.warn("⏳ Waiting for Chart.js to load...");
+          setTimeout(waitForChart, 200);
         }
-      } catch (err) {
-        console.error("❌ Chart registration error:", err);
       }
+      waitForChart();
     });
   </script>
 
