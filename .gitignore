@@ -4,19 +4,21 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Environment and virtualenv
+# Env & venv
 .env
 venv/
 .envrc
 
-# Data and models
+# Data & models
 backend/data/
 backend/models/
+backend/balance.json
+backend/ai_status.json
 
-# IDE/project files
+# OS / IDE
+.DS_Store
 .vscode/
 .idea/
-.DS_Store
 
 # Logs
 *.log

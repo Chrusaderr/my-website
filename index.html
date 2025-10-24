@@ -25,6 +25,7 @@
       <div class="kv"><div class="label">Price</div><div class="val" id="price">—</div></div>
       <div class="kv"><div class="label">Prediction</div><div class="val" id="pred">—</div></div>
       <div class="kv"><div class="label">Accuracy</div><div class="val" id="acc">—</div></div>
+      <div class="kv"><div class="label">Mode</div><div class="val" id="mode">—</div></div>
     </div>
   </div>
 
@@ -38,7 +39,6 @@
       "ma5","ma10","delta","rsi","ema9","macd",
       "macd_signal","boll_upper","boll_lower","bb_pct","atr"
     ];
-
     const fmt = (v,d=2) => (typeof v === "number" ? v.toFixed(d) : v ?? "—");
 
     async function refresh() {
@@ -47,14 +47,15 @@
         if (!res.ok) throw "offline";
         var d = await res.json();
       } catch {
-        const res2 = await fetch("api_preview.json");
-        var d = await res2.json();
+        const res2 = await fetch("api_preview.json").catch(()=>null);
+        var d = res2 ? await res2.json() : {};
       }
 
-      document.getElementById("ts").textContent = d.timestamp;
+      document.getElementById("ts").textContent = d.timestamp ?? "—";
       document.getElementById("price").textContent = fmt(d.close,4);
-      document.getElementById("pred").textContent = d.prediction;
+      document.getElementById("pred").textContent = d.prediction ?? "—";
       document.getElementById("acc").textContent = d.accuracy != null ? (d.accuracy*100).toFixed(2)+"%" : "N/A";
+      document.getElementById("mode").textContent = (d.mode || "—").toUpperCase();
 
       const indicatorsDiv = document.getElementById("indicators");
       indicatorsDiv.innerHTML = indicatorFields.map(k => `

@@ -13,5 +13,6 @@
   "boll_lower": 42000.0,
   "bb_pct": 0.66,
   "atr": 340.11,
-  "accuracy": 0.78
+  "accuracy": 0.78,
+  "mode": "run"
 }

@@ -1,22 +1,21 @@
-# AI Trader Bot + Dashboard
+# AI Trader Dashboard
 
-A trading AI that uses machine learning and rich indicators to predict buy/sell signals, plus a live web dashboard.
+An AI-driven crypto dashboard that learns from charts, predicts movements, and tracks paper profits using Webull data.
 
-## ⚙️ Local Run
+## Features
+- Live data feed from Webull
+- Run / Scan / Off modes
+- Candlestick + RSI chart
+- Paper trading simulation
+- Live accuracy & profit tracking
 
-1. Install dependencies  
-   `pip install -r backend/requirements.txt`
-
-2. Add your credentials in `backend/.env`
-
-3. Start the trader  
-   `python backend/ai_trader.py`
-
-4. Start the API  
-   `python backend/app.py`
-
-5. Open `index.html` in your browser (uses local Flask endpoint or static demo data).
-
-## 🌐 GitHub Pages
-
-When hosted on GitHub Pages, `index.html` automatically loads demo data from `api_preview.json`.
+## Setup
+1. `cd ai_trader/backend`
+2. `pip install -r requirements.txt`
+3. Create `.env` and fill Webull credentials
+4. Run the bot:
+   ```bash
+   python ai_trader.py
+   python app.py
+   ```
+5. Open `frontend/index.html` in your browser.
