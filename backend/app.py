@@ -34,21 +34,32 @@ FEATURES = [
 ]
 
 def fetch_data(symbol="BTCUSDT"):
-    # Faster, consistent Binance mini ticker endpoint
+    """Fetch live ticker data safely with fallback parsing."""
     try:
-        r = requests.get(f"https://api.binance.com/api/v3/ticker/mini?symbol={symbol}", timeout=2)
+        url = f"https://api.binance.com/api/v3/ticker/bookTicker?symbol={symbol}"
+        r = requests.get(url, timeout=2)
         data = r.json()
+
+        # Binance always returns "bidPrice", "askPrice", "symbol"
+        close_price = float(data.get("askPrice") or data.get("bidPrice") or 0)
+
         return {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "open": float(data.get("openPrice", 0)),
-            "high": float(data.get("highPrice", 0)),
-            "low": float(data.get("lowPrice", 0)),
-            "close": float(data.get("closePrice", 0)),
-            "volume": float(data.get("volume", 0)),
+            "open": close_price,
+            "high": close_price,
+            "low": close_price,
+            "close": close_price,
+            "volume": 0.0,  # bookTicker doesn’t have volume, placeholder
         }
+
     except Exception as e:
         print("❌ Fetch error:", e)
+        try:
+            print("Response text:", r.text)
+        except:
+            pass
         return None
+
 
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
