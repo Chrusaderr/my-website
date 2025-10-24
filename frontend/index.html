@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>AI Trader Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module">
+    import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.esm.js";
+    import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from "https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.esm.js";
+    import "https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0";
+    Chart.register(...registerables, CandlestickController, CandlestickElement, OhlcController, OhlcElement);
+    window.Chart = Chart;
+    const $ = (id) => document.getElementById(id);
+    let selectedSymbol = "DOGEUSDT";
+    const maxCandles = 200;
+    const tsEl = () => $("ts"), priceEl=()=>$("price"), predEl=()=>$("pred"), balEl=()=>$("bal"), holdEl=()=>$("hold"), eqEl=()=>$("equity");
+    const riskSlider=()=>$("riskSlider"), riskVal=()=>$("riskVal");
+    let candleChart, indicatorChart;
+    function initCharts(){
+      const ctx = $("priceChart").getContext("2d");
+      candleChart = new Chart(ctx, { type:"candlestick", data:{datasets:[{label:selectedSymbol,data:[]}]},
+        options:{ animation:false, parsing:false,
+          scales:{ x:{type:"time",ticks:{color:"#bfc7d5"},grid:{color:"#232838"}},
+                   y:{ticks:{color:"#bfc7d5"},grid:{color:"#232838"}}},
+          plugins:{ legend:{ labels:{ color:"#cdd5e1" } } } } });
+      const ictx = $("indicatorChart").getContext("2d");
+      indicatorChart = new Chart(ictx, { type:"line",
+        data:{ labels:[], datasets:[
+          {label:"RSI", data:[], borderWidth:1.5, borderColor:"#33d69f", fill:false, yAxisID:"y"},
+          {label:"MACD", data:[], borderWidth:1.5, borderColor:"#ff6b6b", fill:false, yAxisID:"y1"} ]},
+        options:{ animation:false, scales:{
+          x:{display:false}, y:{position:"left",ticks:{color:"#33d69f"},grid:{color:"#232838"}},
+          y1:{position:"right",ticks:{color:"#ff6b6b"},grid:{display:false}}},
+          plugins:{ legend:{ labels:{ color:"#cdd5e1" } } } });
+    }
+    async function setMode(mode){ await fetch(`/mode/${mode}`, {method:"POST"}); }
+    async function pushSymbol(symbol){
+      await fetch(`/symbol`, {method:"POST", headers:{ "Content-Type":"application/json"},
+        body: JSON.stringify({symbol}) });
+    }
+    async function updateWalletUI(){
+      try{ const r=await fetch("/wallet"); const w=await r.json();
+        balEl().textContent = `$${(w.balance??0).toFixed(2)}`;
+        holdEl().textContent = `${(w.position_size??0).toFixed(2)} DOGE @ ${(w.entry_price??0).toFixed(4)}`;
+        eqEl().textContent = `$${(w.equity??0).toFixed(2)}`;
+      }catch{}
+    }
+    async function refresh(){
+      try{
+        const res = await fetch("/latest"); const d = await res.json(); if(d.error) return;
+        tsEl().textContent = d.timestamp ?? "—";
+        priceEl().textContent = typeof d.close==="number" ? d.close.toFixed(6) : "—";
+        predEl().textContent = d.prediction ?? "—";
+        predEl().className = "val " + (d.prediction==="BUY"?"good":d.prediction==="SELL"?"bad":"");
+        if(typeof d.open==="number"){
+          const candle = { x:new Date(d.timestamp), o:d.open,h:d.high,l:d.low,c:d.close };
+          const ds = candleChart.data.datasets[0]; ds.label = selectedSymbol; ds.data.push(candle);
+          if(ds.data.length>maxCandles) ds.data.shift(); candleChart.update("none");
+        }
+        indicatorChart.data.labels.push((d.timestamp||"").split(" ")[1]||"");
+        indicatorChart.data.datasets[0].data.push(d.rsi ?? null);
+        indicatorChart.data.datasets[1].data.push(d.macd ?? null);
+        if(indicatorChart.data.labels.length>maxCandles){ indicatorChart.data.labels.shift();
+          indicatorChart.data.datasets.forEach(s=>s.data.shift()); }
+        indicatorChart.update("none");
+        await updateWalletUI();
+      }catch(e){ console.error(e); }
+    }
+    window.addEventListener("load", ()=>{
+      $("btnStart").onclick = ()=> setMode("run");
+      $("btnScan").onclick  = ()=> setMode("scan");
+      $("btnStop").onclick  = ()=> setMode("off");
+      $("coinSelect").addEventListener("change", async e=>{
+        selectedSymbol = e.target.value;
+        candleChart.data.datasets[0].data = [];
+        indicatorChart.data.labels = []; indicatorChart.data.datasets.forEach(s=>s.data=[]);
+        await pushSymbol(selectedSymbol);
+      });
+      riskSlider().addEventListener("input", async e=>{
+        const val = Number(e.target.value); riskVal().textContent = val + "%";
+        await fetch("/set_trade_fraction",{ method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ fraction: Math.max(5, Math.min(val, 50))/100 }) });
+      });
+      initCharts(); riskVal().textContent = riskSlider().value + "%";
+      setInterval(refresh, 1000); refresh();
+    });
+  </script>
+</head>
+<body>
+  <header class="header">
+    <h1>AI Trader Dashboard</h1>
+    <div class="badges">
+      <span class="badge">v4.7 • Pro Sim</span>
+      <span class="badge">Data: Binance → CoinGecko (fallback)</span>
+      <a class="btnlink" href="/logs" target="_blank">Live Logs</a>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="title">Controls & Live Stats</div>
+    <div class="row">
+      <div class="kv">
+        <div class="label">Coin</div>
+        <select id="coinSelect">
+          <option value="DOGEUSDT" selected>Dogecoin (DOGE)</option>
+          <option value="BTCUSDT">Bitcoin (BTC)</option>
+          <option value="ETHUSDT">Ethereum (ETH)</option>
+          <option value="SOLUSDT">Solana (SOL)</option>
+          <option value="ADAUSDT">Cardano (ADA)</option>
+        </select>
+      </div>
+      <div class="row btnrow">
+        <button id="btnStart" class="btn good">Start</button>
+        <button id="btnScan"  class="btn warn">Scan</button>
+        <button id="btnStop"  class="btn bad">Stop</button>
+      </div>
+      <div class="kv"><div class="label">Timestamp</div><div class="val" id="ts">—</div></div>
+      <div class="kv"><div class="label">Price</div><div class="val" id="price">—</div></div>
+      <div class="kv"><div class="label">Prediction</div><div class="val" id="pred">—</div></div>
+      <div class="kv">
+        <div class="label">Trade Allocation</div>
+        <input type="range" id="riskSlider" min="5" max="50" value="25" step="5" style="width:150px;">
+        <div class="val" id="riskVal">25%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title">Portfolio (Virtual)</div>
+    <div class="row">
+      <div class="kv"><div class="label">Balance</div><div class="val" id="bal">$10,000.00</div></div>
+      <div class="kv"><div class="label">Holdings</div><div class="val" id="hold">0 DOGE @ 0.0000</div></div>
+      <div class="kv"><div class="label">Equity</div><div class="val" id="equity">$10,000.00</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title">Live Candlestick Chart (1s Updates)</div>
+    <canvas id="priceChart" height="300"></canvas>
+    <canvas id="indicatorChart" class="subchart" height="120"></canvas>
+  </div>
+
+  <footer class="footer"><small>Paper-trading simulator. Not financial advice.</small></footer>
+</body>
+</html>
