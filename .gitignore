@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment and virtualenv
+.env
+venv/
+.envrc
+
+# Data and models
+backend/data/
+backend/models/
+
+# IDE/project files
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
