@@ -6,28 +6,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:,">
 
-  <!-- Core Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <!-- ✅ Load Chart.js first -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <!-- Chart.js financial plugin (candlestick/ohlc support) -->
+  <!-- ✅ Load the financial plugin AFTER Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.min.js"></script>
 
-  <!-- Date adapter -->
+  <!-- ✅ Load the date adapter -->
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.min.js"></script>
 
   <script>
-    // ✅ Explicitly register all required controllers and elements
-    const fin = window['chartjs-chart-financial'];
-    if (fin && Chart) {
-      Chart.register(
-        fin.CandlestickController,
-        fin.OhlcController,
-        fin.CandlestickElement,
-        fin.OhlcElement
-      );
-    } else {
-      console.error("❌ Financial plugin failed to load.");
-    }
+    // ✅ Wait until Chart.js is fully loaded before registering
+    window.addEventListener('load', () => {
+      try {
+        const fin = window['chartjs-chart-financial'];
+        if (fin && window.Chart) {
+          Chart.register(
+            fin.CandlestickController,
+            fin.OhlcController,
+            fin.CandlestickElement,
+            fin.OhlcElement
+          );
+          console.log("✅ Candlestick controller registered successfully!");
+        } else {
+          console.error("❌ Financial plugin or Chart.js failed to load.");
+        }
+      } catch (err) {
+        console.error("❌ Chart registration error:", err);
+      }
+    });
   </script>
 
   <style>
@@ -83,18 +90,22 @@
     const maxCandles = 60;
 
     const ctx = document.getElementById("priceChart").getContext("2d");
-    const candleChart = new Chart(ctx, {
-      type: 'candlestick',
-      data: { datasets: [{ label: selectedSymbol, data: [] }] },
-      options: {
-        animation: false,
-        parsing: false,
-        scales: {
-          x: { type: 'time', ticks: { color: '#ccc' }, grid: { color: '#222' } },
-          y: { ticks: { color: '#ccc' }, grid: { color: '#222' } }
-        },
-        plugins: { legend: { labels: { color: '#ccc' } } }
-      }
+    let candleChart;
+
+    window.addEventListener('load', () => {
+      candleChart = new Chart(ctx, {
+        type: 'candlestick',
+        data: { datasets: [{ label: selectedSymbol, data: [] }] },
+        options: {
+          animation: false,
+          parsing: false,
+          scales: {
+            x: { type: 'time', ticks: { color: '#ccc' }, grid: { color: '#222' } },
+            y: { ticks: { color: '#ccc' }, grid: { color: '#222' } }
+          },
+          plugins: { legend: { labels: { color: '#ccc' } } }
+        }
+      });
     });
 
     const ictx = document.getElementById("indicatorChart").getContext("2d");
@@ -134,7 +145,7 @@
       try {
         const res = await fetch(`/latest`);
         const d = await res.json();
-        if (d.error) return;
+        if (d.error || !candleChart) return;
 
         document.getElementById("ts").textContent = d.timestamp;
         document.getElementById("price").textContent = d.close.toFixed(4);
@@ -162,6 +173,7 @@
 
     document.getElementById("coinSelect").addEventListener("change", async (e) => {
       selectedSymbol = e.target.value;
+      if (!candleChart) return;
       candleChart.data.datasets[0].data = [];
       indicatorChart.data.labels = [];
       indicatorChart.data.datasets.forEach(s => s.data = []);
